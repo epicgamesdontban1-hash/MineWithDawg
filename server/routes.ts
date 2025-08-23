@@ -63,6 +63,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/admin/connections", async (req, res) => {
+    try {
+      const connections = await storage.getAllBotConnections();
+      const connectionsWithStatus = connections.map(conn => ({
+        ...conn,
+        isActive: activeBots.has(conn.id)
+      }));
+      res.json(connectionsWithStatus);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get connections" });
+    }
+  });
+
+  app.delete("/api/admin/connections/:id", async (req, res) => {
+    try {
+      const connectionId = req.params.id;
+      const botInstance = activeBots.get(connectionId);
+      
+      if (botInstance) {
+        if (botInstance.bot) {
+          botInstance.bot.quit();
+        }
+        activeBots.delete(connectionId);
+        await storage.updateBotConnection(connectionId, { isConnected: false });
+        
+        // Notify the WebSocket client
+        if (botInstance.ws && botInstance.ws.readyState === WebSocket.OPEN) {
+          botInstance.ws.send(JSON.stringify({ 
+            type: 'bot_disconnected', 
+            data: { connectionId } 
+          }));
+        }
+      }
+      
+      res.json({ success: true, message: "Bot terminated successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to terminate bot" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   // WebSocket Server

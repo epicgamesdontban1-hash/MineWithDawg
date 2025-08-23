@@ -277,6 +277,35 @@ export default function Home() {
     }
   };
 
+  const handleTerminateBot = async (connectionId: string) => {
+    try {
+      const response = await fetch(`/api/admin/connections/${connectionId}`, {
+        method: 'DELETE'
+      });
+      
+      if (response.ok) {
+        toast({
+          title: "Bot Terminated",
+          description: "Bot has been successfully terminated",
+        });
+        // Refresh the connections list
+        const connectionsResponse = await fetch('/api/admin/connections');
+        if (connectionsResponse.ok) {
+          const connections = await connectionsResponse.json();
+          setAdminConnections(connections);
+        }
+      } else {
+        throw new Error('Failed to terminate bot');
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to terminate bot",
+        variant: "destructive",
+      });
+    }
+  };
+
   const formatTime = (date: Date) => {
     return new Date(date).toLocaleTimeString('en-US', {
       hour12: false,
@@ -527,7 +556,7 @@ export default function Home() {
                     data-testid="tab-chat"
                     onClick={() => setActiveTab('chat')}
                     variant={activeTab === 'chat' ? 'default' : 'outline'}
-                    className="flex-1"
+                    className="flex-1 text-sm"
                   >
                     Chat
                   </Button>
@@ -535,9 +564,17 @@ export default function Home() {
                     data-testid="tab-logs"
                     onClick={() => setActiveTab('logs')}
                     variant={activeTab === 'logs' ? 'default' : 'outline'}
-                    className="flex-1"
+                    className="flex-1 text-sm"
                   >
                     Logs
+                  </Button>
+                  <Button
+                    data-testid="tab-admin"
+                    onClick={() => setActiveTab('admin')}
+                    variant={activeTab === 'admin' ? 'default' : 'outline'}
+                    className="flex-1 text-sm"
+                  >
+                    Admin
                   </Button>
                 </div>
               </CardHeader>
@@ -584,7 +621,7 @@ export default function Home() {
                         ))
                       )}
                     </div>
-                  ) : (
+                  ) : activeTab === 'logs' ? (
                     <div 
                       ref={logsRef}
                       className="flex-1 p-4 overflow-y-auto max-h-96 space-y-1"
@@ -615,6 +652,76 @@ export default function Home() {
                           </div>
                         ))
                       )}
+                    </div>
+                  ) : (
+                    <div 
+                      className="flex-1 p-4 overflow-y-auto max-h-96"
+                      data-testid="admin-panel"
+                    >
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-lg font-semibold text-minecraft-green">Bot Management</h3>
+                          <Badge variant="outline" className="text-xs">
+                            {adminConnections.filter(conn => conn.isActive).length} Active
+                          </Badge>
+                        </div>
+                        
+                        {adminConnections.length === 0 ? (
+                          <div className="text-gray-400 text-center py-8">
+                            No bot connections found
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            {adminConnections.map((conn) => (
+                              <div key={conn.id} className="bg-gray-700 rounded-lg p-4 border border-gray-600">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex-1">
+                                    <div className="flex items-center space-x-3">
+                                      <div className={`w-3 h-3 rounded-full ${
+                                        conn.isActive ? 'bg-status-online animate-pulse' : 'bg-status-offline'
+                                      }`} />
+                                      <div>
+                                        <div className="font-medium text-white">
+                                          {conn.username}
+                                        </div>
+                                        <div className="text-sm text-gray-400">
+                                          {conn.serverIp} • {conn.version}
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <div className="mt-2 flex items-center space-x-4 text-xs text-gray-400">
+                                      <span>
+                                        Status: <span className={conn.isActive ? 'text-green-400' : 'text-red-400'}>
+                                          {conn.isActive ? 'Online' : 'Offline'}
+                                        </span>
+                                      </span>
+                                      {conn.lastPing && (
+                                        <span>Ping: {conn.lastPing}ms</span>
+                                      )}
+                                      <span>
+                                        Created: {formatTime(new Date(conn.createdAt))}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <div className="flex space-x-2">
+                                    {conn.isActive && (
+                                      <Button
+                                        onClick={() => handleTerminateBot(conn.id)}
+                                        variant="destructive"
+                                        size="sm"
+                                        className="text-xs"
+                                        data-testid={`terminate-bot-${conn.id}`}
+                                      >
+                                        Terminate
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
 

@@ -10,6 +10,7 @@ export interface IStorage {
   createBotConnection(connection: InsertBotConnection): Promise<BotConnection>;
   updateBotConnection(id: string, updates: Partial<BotConnection>): Promise<BotConnection | undefined>;
   deleteBotConnection(id: string): Promise<boolean>;
+  getAllBotConnections(): Promise<BotConnection[]>;
   
   getChatMessages(connectionId: string, limit?: number): Promise<ChatMessage[]>;
   createChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
@@ -76,6 +77,11 @@ export class MemStorage implements IStorage {
 
   async deleteBotConnection(id: string): Promise<boolean> {
     return this.botConnections.delete(id);
+  }
+
+  async getAllBotConnections(): Promise<BotConnection[]> {
+    return Array.from(this.botConnections.values())
+      .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
   }
 
   async getChatMessages(connectionId: string, limit: number = 50): Promise<ChatMessage[]> {
