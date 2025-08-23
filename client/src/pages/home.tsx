@@ -327,8 +327,8 @@ export default function Home() {
                 <Box className="text-white text-xl" />
               </div>
               <div>
-                <h1 className="text-2xl font-gaming font-bold text-minecraft-green">MinecraftBot</h1>
-                <p className="text-sm text-gray-400">Web Controller v1.0</p>
+                <h1 className="text-2xl font-gaming font-bold text-minecraft-green">MineWithDawg</h1>
+                <p className="text-sm text-gray-400">Made by doggo, for doggo v1.0</p>
               </div>
             </div>
             <div className="flex items-center space-x-3">
