@@ -190,9 +190,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
           logLevel: 'info',
           message: `Bot ${username} successfully logged into server`
         });
+        
+        // Get server info
+        const serverInfo = {
+          version: bot.version,
+          players: `${Object.keys(bot.players).length}/${bot.game?.maxPlayers || 20}`,
+          maxPlayers: bot.game?.maxPlayers || 20
+        };
+        
         ws.send(JSON.stringify({ 
           type: 'bot_connected', 
-          data: { connectionId, username } 
+          data: { 
+            connectionId, 
+            username,
+            version: serverInfo.version,
+            players: serverInfo.players
+          } 
+        }));
+        
+        // Send server info update
+        ws.send(JSON.stringify({
+          type: 'server_info_update',
+          data: {
+            version: serverInfo.version,
+            players: serverInfo.players,
+            motd: "Connected"
+          }
+        }));
+        
+        // Send initial players list
+        const playersList = Object.values(bot.players).map((player: any) => ({
+          uuid: player.uuid,
+          username: player.username,
+          ping: player.ping
+        }));
+        
+        ws.send(JSON.stringify({
+          type: 'players_update',
+          data: {
+            players: playersList,
+            maxPlayers: serverInfo.maxPlayers
+          }
         }));
         
         // Send initial position
@@ -270,6 +308,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           type: 'chat_message', 
           data: joinMessage 
         }));
+        
+        // Update players list
+        const playersList = Object.values(bot.players).map((p: any) => ({
+          uuid: p.uuid,
+          username: p.username,
+          ping: p.ping
+        }));
+        
+        ws.send(JSON.stringify({
+          type: 'players_update',
+          data: {
+            players: playersList,
+            maxPlayers: bot.game?.maxPlayers || 20
+          }
+        }));
       });
 
       bot.on('playerLeft', async (player: any) => {
@@ -284,6 +337,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ws.send(JSON.stringify({ 
           type: 'chat_message', 
           data: leaveMessage 
+        }));
+        
+        // Update players list
+        const playersList = Object.values(bot.players).map((p: any) => ({
+          uuid: p.uuid,
+          username: p.username,
+          ping: p.ping
+        }));
+        
+        ws.send(JSON.stringify({
+          type: 'players_update',
+          data: {
+            players: playersList,
+            maxPlayers: bot.game?.maxPlayers || 20
+          }
         }));
       });
 
@@ -316,21 +384,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }));
       });
 
-      bot.on('end', async () => {
+      bot.on('end', async (reason?: string) => {
         await storage.updateBotConnection(connectionId, { isConnected: false });
+        
+        let disconnectReason = reason || 'Connection ended';
+        let logMessage = `Bot ${username} disconnected from server`;
+        
+        if (reason) {
+          logMessage += ` - Reason: ${reason}`;
+        }
+        
         await storage.createBotLog({
           connectionId,
           logLevel: 'warning',
-          message: `Bot ${username} disconnected from server`
+          message: logMessage
         });
+        
         activeBots.delete(connectionId);
         ws.send(JSON.stringify({ 
           type: 'bot_disconnected', 
-          data: { connectionId } 
+          data: { 
+            connectionId,
+            reason: disconnectReason
+          } 
         }));
       });
 
-      // Send ping and position updates
+      // Handle kick events specifically
+      bot.on('kicked', async (reason: string) => {
+        const kickReason = reason || 'Kicked from server';
+        await storage.createBotLog({
+          connectionId,
+          logLevel: 'warning',
+          message: `Bot ${username} was kicked: ${kickReason}`
+        });
+        
+        ws.send(JSON.stringify({ 
+          type: 'bot_disconnected', 
+          data: { 
+            connectionId,
+            reason: kickReason
+          } 
+        }));
+      });
+
+      // Send ping, position, and server info updates
       const updateInterval = setInterval(() => {
         if (bot.player && ws.readyState === WebSocket.OPEN) {
           const ping = bot.player.ping || 0;
@@ -351,8 +449,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }
             }));
           }
+          
+          // Send updated server info and players list
+          const playersList = Object.values(bot.players).map((player: any) => ({
+            uuid: player.uuid,
+            username: player.username,
+            ping: player.ping
+          }));
+          
+          ws.send(JSON.stringify({
+            type: 'server_info_update',
+            data: {
+              version: bot.version,
+              players: `${playersList.length}/${bot.game?.maxPlayers || 20}`,
+              motd: "Connected"
+            }
+          }));
+          
+          ws.send(JSON.stringify({
+            type: 'players_update',
+            data: {
+              players: playersList,
+              maxPlayers: bot.game?.maxPlayers || 20
+            }
+          }));
         }
-      }, 2000);
+      }, 3000);
       
       // Cleanup interval on bot end
       bot.on('end', () => {

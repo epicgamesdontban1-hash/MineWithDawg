@@ -43,8 +43,25 @@ interface ConnectionStatus {
   };
 }
 
+interface OnlinePlayer {
+  uuid: string;
+  username: string;
+  ping?: number;
+}
+
+interface AdminConnection {
+  id: string;
+  username: string;
+  serverIp: string;
+  version: string;
+  isConnected: boolean;
+  isActive: boolean;
+  lastPing?: number;
+  createdAt: string;
+}
+
 const MINECRAFT_VERSIONS = [
-  '1.21.5', '1.21.4', '1.21.3', '1.21.2', '1.21.1', '1.21.0',
+  '1.21.4', '1.21.3', '1.21.2', '1.21.1', '1.21.0',
   '1.20.6', '1.20.4', '1.20.2', '1.20.1',
   '1.19.4', '1.19.2', '1.18.2'
 ];
@@ -54,12 +71,26 @@ const QUICK_COMMANDS = ['/help', '/list', '/spawn', '/home'];
 export default function Home() {
   const [username, setUsername] = useState("Player123");
   const [serverIP, setServerIP] = useState("");
-  const [version, setVersion] = useState("1.21.5");
+  const [version, setVersion] = useState("1.21.4");
   const [chatInput, setChatInput] = useState("");
   const [connectionId, setConnectionId] = useState<string | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [botLogs, setBotLogs] = useState<BotLog[]>([]);
-  const [activeTab, setActiveTab] = useState<'chat' | 'logs'>('chat');
+  const [adminConnections, setAdminConnections] = useState<AdminConnection[]>([]);
+  const [isLoadingAdmin, setIsLoadingAdmin] = useState(false);
+  const [activeTab, setActiveTab] = useState<'chat' | 'logs' | 'admin' | 'players'>('chat');
+  const [onlinePlayers, setOnlinePlayers] = useState<OnlinePlayer[]>([]);
+  const [kickReason, setKickReason] = useState<string | null>(null);
+  const [autoReconnect, setAutoReconnect] = useState(false);
+  const [lastConnectionData, setLastConnectionData] = useState<{
+    username: string;
+    serverIp: string;
+    version: string;
+  } | null>(null);
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
+  const [adminPassword, setAdminPassword] = useState("");
+  const [showAdminLogin, setShowAdminLogin] = useState(false);
+  const autoReconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>({
     isConnected: false,
     ping: 0,
@@ -83,41 +114,78 @@ export default function Home() {
   const { isConnected: wsConnected, sendMessage } = useWebSocket({
     onMessage: (message) => {
       const { type, data } = message;
-      
+
       switch (type) {
         case 'bot_connected':
           setConnectionStatus(prev => ({
             ...prev,
             isConnected: true,
             username: data.username,
-            serverInfo: { ...prev.serverInfo, motd: "Connected" }
+            serverInfo: { 
+              ...prev.serverInfo, 
+              motd: "Connected",
+              version: data.version || prev.serverInfo.version,
+              players: data.players || prev.serverInfo.players
+            }
           }));
+          setKickReason(null);
           toast({
             title: "Bot Connected",
             description: `Successfully connected as ${data.username}`,
           });
           break;
-          
+
         case 'bot_disconnected':
           setConnectionStatus(prev => ({
             ...prev,
             isConnected: false,
             serverInfo: { ...prev.serverInfo, motd: "Disconnected" }
           }));
-          toast({
-            title: "Bot Disconnected",
-            description: "Bot has been disconnected from the server",
-          });
-          break;
+          setOnlinePlayers([]);
           
+          // Set kick reason if provided
+          if (data.reason) {
+            setKickReason(data.reason);
+          }
+          
+          const disconnectMessage = data.reason 
+            ? `Bot disconnected: ${data.reason}` 
+            : "Auto-reconnecting in 5 seconds...";
+          
+          if (autoReconnect && lastConnectionData && !data.reason) {
+            toast({
+              title: "Bot Disconnected",
+              description: disconnectMessage,
+            });
+            
+            // Clear any existing timeout
+            if (autoReconnectTimeoutRef.current) {
+              clearTimeout(autoReconnectTimeoutRef.current);
+            }
+            
+            autoReconnectTimeoutRef.current = setTimeout(() => {
+              if (lastConnectionData && wsConnected && sendMessage && autoReconnect) {
+                console.log('Auto-reconnecting bot...');
+                handleReconnect();
+              }
+            }, 5000);
+          } else {
+            toast({
+              title: "Bot Disconnected",
+              description: disconnectMessage,
+              variant: data.reason ? "destructive" : "default",
+            });
+          }
+          break;
+
         case 'chat_message':
           setChatMessages(prev => [...prev, data]);
           break;
-          
+
         case 'ping_update':
           setConnectionStatus(prev => ({ ...prev, ping: data.ping }));
           break;
-          
+
         case 'position_update':
           setConnectionStatus(prev => ({
             ...prev,
@@ -128,7 +196,29 @@ export default function Home() {
             }
           }));
           break;
-          
+
+        case 'server_info_update':
+          setConnectionStatus(prev => ({
+            ...prev,
+            serverInfo: {
+              players: data.players || prev.serverInfo.players,
+              version: data.version || prev.serverInfo.version,
+              motd: data.motd || prev.serverInfo.motd
+            }
+          }));
+          break;
+
+        case 'players_update':
+          setOnlinePlayers(data.players || []);
+          setConnectionStatus(prev => ({
+            ...prev,
+            serverInfo: {
+              ...prev.serverInfo,
+              players: `${data.players?.length || 0}/${data.maxPlayers || 20}`
+            }
+          }));
+          break;
+
         case 'connection_error':
         case 'bot_error':
           toast({
@@ -146,7 +236,7 @@ export default function Home() {
       chatMessagesRef.current.scrollTop = chatMessagesRef.current.scrollHeight;
     }
   }, [chatMessages]);
-  
+
   useEffect(() => {
     if (logsRef.current) {
       logsRef.current.scrollTop = logsRef.current.scrollHeight;
@@ -167,12 +257,38 @@ export default function Home() {
           console.error('Failed to fetch logs:', error);
         }
       };
-      
+
       fetchLogs();
       const interval = setInterval(fetchLogs, 5000);
       return () => clearInterval(interval);
     }
   }, [connectionId]);
+
+  // Fetch admin connections on mount and when activeTab is 'admin'
+  useEffect(() => {
+    if (activeTab === 'admin') {
+      const fetchAdminConnections = async () => {
+        setIsLoadingAdmin(true);
+        try {
+          const response = await fetch('/api/admin/connections');
+          if (response.ok) {
+            const connections = await response.json();
+            setAdminConnections(connections);
+          }
+        } catch (error) {
+          console.error('Failed to fetch admin connections:', error);
+          toast({
+            title: "Error",
+            description: "Failed to load bot connections.",
+            variant: "destructive",
+          });
+        } finally {
+          setIsLoadingAdmin(false);
+        }
+      };
+      fetchAdminConnections();
+    }
+  }, [activeTab]);
 
   const handleConnect = async () => {
     if (!username.trim() || !serverIP.trim()) {
@@ -201,6 +317,13 @@ export default function Home() {
 
       const connection = await response.json();
       setConnectionId(connection.id);
+      
+      // Store connection data for auto-reconnect
+      setLastConnectionData({
+        username: username.trim(),
+        serverIp: serverIP.trim(),
+        version
+      });
 
       if (wsConnected && sendMessage) {
         sendMessage({
@@ -231,6 +354,55 @@ export default function Home() {
       setConnectionId(null);
       setChatMessages([]);
       setBotLogs([]);
+      setAutoReconnect(false);
+      setLastConnectionData(null);
+      
+      // Clear auto-reconnect timeout
+      if (autoReconnectTimeoutRef.current) {
+        clearTimeout(autoReconnectTimeoutRef.current);
+        autoReconnectTimeoutRef.current = null;
+      }
+    }
+  };
+
+  const handleReconnect = async () => {
+    if (!lastConnectionData) return;
+
+    try {
+      const response = await fetch('/api/connections', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: lastConnectionData.username,
+          serverIp: lastConnectionData.serverIp,
+          version: lastConnectionData.version
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create connection');
+      }
+
+      const connection = await response.json();
+      setConnectionId(connection.id);
+
+      if (wsConnected && sendMessage) {
+        sendMessage({
+          type: 'connect_bot',
+          data: {
+            connectionId: connection.id,
+            username: lastConnectionData.username,
+            serverIp: lastConnectionData.serverIp,
+            version: lastConnectionData.version
+          }
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Auto-Reconnect Failed",
+        description: error instanceof Error ? error.message : "Failed to reconnect",
+        variant: "destructive",
+      });
     }
   };
 
@@ -277,12 +449,38 @@ export default function Home() {
     }
   };
 
+  const handleAdminLogin = () => {
+    if (adminPassword === "Operator") {
+      setIsAdminAuthenticated(true);
+      setShowAdminLogin(false);
+      setAdminPassword("");
+      toast({
+        title: "Access Granted",
+        description: "Welcome to Admin Panel",
+      });
+    } else {
+      toast({
+        title: "Access Denied",
+        description: "Incorrect password",
+        variant: "destructive",
+      });
+      setAdminPassword("");
+    }
+  };
+
+  const handleAdminTabClick = () => {
+    if (!isAdminAuthenticated) {
+      setShowAdminLogin(true);
+    }
+    setActiveTab('admin');
+  };
+
   const handleTerminateBot = async (connectionId: string) => {
     try {
       const response = await fetch(`/api/admin/connections/${connectionId}`, {
         method: 'DELETE'
       });
-      
+
       if (response.ok) {
         toast({
           title: "Bot Terminated",
@@ -376,7 +574,7 @@ export default function Home() {
 
       <div className="container mx-auto px-4 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
+
           {/* Connection Panel */}
           <div className="lg:col-span-1">
             <Card className="bg-gray-800 border-minecraft-dark-stone">
@@ -422,7 +620,7 @@ export default function Home() {
                     <SelectContent>
                       {MINECRAFT_VERSIONS.map((v) => (
                         <SelectItem key={v} value={v}>
-                          {v} {v === '1.21.5' ? '(Latest)' : ''}
+                          {v} {v === '1.21.4' ? '(Latest Supported)' : ''}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -451,22 +649,48 @@ export default function Home() {
                   </Button>
                 </div>
 
-                <Card className="bg-gray-700">
-                  <CardContent className="pt-3">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-300">Status:</span>
-                      <Badge variant={connectionStatus.isConnected ? "default" : "destructive"}>
-                        {connectionStatus.isConnected ? 'Connected' : 'Disconnected'}
-                      </Badge>
+                {lastConnectionData && (
+                  <div className="flex items-center space-x-3 p-3 bg-gray-700 rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="auto-reconnect"
+                        checked={autoReconnect}
+                        onChange={(e) => setAutoReconnect(e.target.checked)}
+                        className="w-4 h-4 text-minecraft-green bg-gray-600 border-gray-500 rounded focus:ring-minecraft-green"
+                      />
+                      <label htmlFor="auto-reconnect" className="text-sm text-gray-300">
+                        Auto-reconnect
+                      </label>
                     </div>
-                    <div className="flex justify-between text-sm mt-1">
-                      <span className="text-gray-300">Ping:</span>
-                      <span className="text-gray-400" data-testid="text-ping">
-                        {connectionStatus.ping > 0 ? `${connectionStatus.ping} ms` : '-- ms'}
-                      </span>
-                    </div>
-                  </CardContent>
-                </Card>
+                    <Button
+                      data-testid="button-reconnect"
+                      onClick={handleReconnect}
+                      disabled={connectionStatus.isConnected || !wsConnected}
+                      size="sm"
+                      className="bg-minecraft-gold hover:bg-yellow-600 text-gray-900"
+                    >
+                      Reconnect Now
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gray-700 mt-4">
+              <CardContent className="pt-3">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-300">Status:</span>
+                  <Badge variant={connectionStatus.isConnected ? "default" : "destructive"}>
+                    {connectionStatus.isConnected ? 'Connected' : 'Disconnected'}
+                  </Badge>
+                </div>
+                <div className="flex justify-between text-sm mt-1">
+                  <span className="text-gray-300">Ping:</span>
+                  <span className="text-gray-400" data-testid="text-ping">
+                    {connectionStatus.ping > 0 ? `${connectionStatus.ping} ms` : '-- ms'}
+                  </span>
+                </div>
               </CardContent>
             </Card>
 
@@ -490,7 +714,7 @@ export default function Home() {
                   >
                     W
                   </Button>
-                  
+
                   <div className="flex space-x-2">
                     <Button
                       data-testid="button-move-left"
@@ -523,7 +747,7 @@ export default function Home() {
                       D
                     </Button>
                   </div>
-                  
+
                   <Button
                     data-testid="button-jump"
                     onClick={() => handleMovement('jump', 'start')}
@@ -533,7 +757,7 @@ export default function Home() {
                     SPACE
                   </Button>
                 </div>
-                
+
                 {!connectionStatus.isConnected && (
                   <div className="mt-4 text-xs text-gray-400 text-center">
                     Connect to server to enable controls
@@ -569,19 +793,27 @@ export default function Home() {
                     Logs
                   </Button>
                   <Button
+                    data-testid="tab-players"
+                    onClick={() => setActiveTab('players')}
+                    variant={activeTab === 'players' ? 'default' : 'outline'}
+                    className="flex-1 text-sm"
+                  >
+                    Players ({onlinePlayers.length})
+                  </Button>
+                  <Button
                     data-testid="tab-admin"
-                    onClick={() => setActiveTab('admin')}
+                    onClick={handleAdminTabClick}
                     variant={activeTab === 'admin' ? 'default' : 'outline'}
                     className="flex-1 text-sm"
                   >
-                    Admin
+                    Admin {isAdminAuthenticated ? '🔓' : '🔒'}
                   </Button>
                 </div>
               </CardHeader>
               <CardContent className="flex-1 flex flex-col">
                 <div className="flex-1 bg-chat-bg rounded-lg border border-gray-700 mb-4 overflow-hidden flex flex-col">
                   {activeTab === 'chat' ? (
-                    <div 
+                    <div
                       ref={chatMessagesRef}
                       className="flex-1 p-4 overflow-y-auto max-h-96 space-y-2"
                       data-testid="chat-messages"
@@ -603,12 +835,12 @@ export default function Home() {
                             ) : (
                               <>
                                 <span className={`font-medium ml-1 ${
-                                  msg.messageType === 'system' || msg.messageType === 'join' || msg.messageType === 'leave' || msg.messageType === 'death' 
-                                    ? 'text-yellow-300' 
+                                  msg.messageType === 'system' || msg.messageType === 'join' || msg.messageType === 'leave' || msg.messageType === 'death'
+                                    ? 'text-yellow-300'
                                     : 'text-minecraft-green'
                                 }`}>
-                                  {msg.messageType === 'system' || msg.messageType === 'join' || msg.messageType === 'leave' || msg.messageType === 'death' 
-                                    ? '[Server]' 
+                                  {msg.messageType === 'system' || msg.messageType === 'join' || msg.messageType === 'leave' || msg.messageType === 'death'
+                                    ? '[Server]'
                                     : `<${msg.username}>`
                                   }
                                 </span>
@@ -622,7 +854,7 @@ export default function Home() {
                       )}
                     </div>
                   ) : activeTab === 'logs' ? (
-                    <div 
+                    <div
                       ref={logsRef}
                       className="flex-1 p-4 overflow-y-auto max-h-96 space-y-1"
                       data-testid="bot-logs"
@@ -653,75 +885,200 @@ export default function Home() {
                         ))
                       )}
                     </div>
+                  ) : activeTab === 'players' ? (
+                    <div
+                      className="flex-1 p-4 overflow-y-auto max-h-96 space-y-2"
+                      data-testid="players-list"
+                    >
+                      {!connectionStatus.isConnected ? (
+                        <div className="text-gray-400 text-center py-8">
+                          Connect to a server to see online players!
+                        </div>
+                      ) : onlinePlayers.length === 0 ? (
+                        <div className="text-gray-400 text-center py-8">
+                          No players online or data not available
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between border-b border-gray-700 pb-2">
+                            <h3 className="text-lg font-semibold text-minecraft-green">
+                              Online Players ({onlinePlayers.length})
+                            </h3>
+                          </div>
+                          {onlinePlayers.map((player) => (
+                            <div key={player.uuid} className="bg-gray-700 rounded-lg p-3 border border-gray-600">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center space-x-3">
+                                  <div className="w-8 h-8 bg-minecraft-green rounded flex items-center justify-center">
+                                    <span className="text-white text-sm font-bold">
+                                      {player.username.charAt(0).toUpperCase()}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <div className="font-medium text-white">
+                                      {player.username}
+                                    </div>
+                                    <div className="text-xs text-gray-400">
+                                      UUID: {player.uuid.substring(0, 8)}...
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  {player.ping !== undefined && (
+                                    <div className="text-sm text-gray-400">
+                                      {player.ping}ms
+                                    </div>
+                                  )}
+                                  <div className="w-3 h-3 bg-status-online rounded-full animate-pulse" />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {kickReason && (
+                        <div className="mt-4 p-3 bg-red-900/20 border border-red-600 rounded-lg">
+                          <div className="flex items-center space-x-2">
+                            <div className="w-4 h-4 bg-red-500 rounded-full" />
+                            <span className="text-red-400 font-medium">Last Disconnect Reason:</span>
+                          </div>
+                          <div className="text-red-300 mt-1">
+                            {kickReason}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   ) : (
-                    <div 
+                    <div
                       className="flex-1 p-4 overflow-y-auto max-h-96"
                       data-testid="admin-panel"
                     >
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <h3 className="text-lg font-semibold text-minecraft-green">Bot Management</h3>
-                          <Badge variant="outline" className="text-xs">
-                            {adminConnections.filter(conn => conn.isActive).length} Active
-                          </Badge>
-                        </div>
-                        
-                        {adminConnections.length === 0 ? (
-                          <div className="text-gray-400 text-center py-8">
-                            No bot connections found
+                      {showAdminLogin && !isAdminAuthenticated ? (
+                        <div className="flex flex-col items-center justify-center space-y-4 py-12">
+                          <div className="text-center">
+                            <h3 className="text-xl font-semibold text-minecraft-green mb-2">Admin Access Required</h3>
+                            <p className="text-gray-400 mb-6">Enter password to access admin panel</p>
                           </div>
-                        ) : (
-                          <div className="space-y-3">
-                            {adminConnections.map((conn) => (
-                              <div key={conn.id} className="bg-gray-700 rounded-lg p-4 border border-gray-600">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex-1">
-                                    <div className="flex items-center space-x-3">
-                                      <div className={`w-3 h-3 rounded-full ${
-                                        conn.isActive ? 'bg-status-online animate-pulse' : 'bg-status-offline'
-                                      }`} />
-                                      <div>
-                                        <div className="font-medium text-white">
-                                          {conn.username}
-                                        </div>
-                                        <div className="text-sm text-gray-400">
-                                          {conn.serverIp} • {conn.version}
+                          <div className="w-full max-w-sm space-y-3">
+                            <Input
+                              type="password"
+                              placeholder="Enter admin password"
+                              value={adminPassword}
+                              onChange={(e) => setAdminPassword(e.target.value)}
+                              onKeyPress={(e) => e.key === 'Enter' && handleAdminLogin()}
+                              className="bg-gray-700 border-gray-600 text-white focus:border-minecraft-green"
+                            />
+                            <div className="flex space-x-2">
+                              <Button
+                                onClick={handleAdminLogin}
+                                className="flex-1 bg-minecraft-green hover:bg-minecraft-dark-green"
+                              >
+                                Login
+                              </Button>
+                              <Button
+                                onClick={() => {
+                                  setShowAdminLogin(false);
+                                  setActiveTab('chat');
+                                  setAdminPassword("");
+                                }}
+                                variant="outline"
+                                className="flex-1"
+                              >
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      ) : !isAdminAuthenticated ? (
+                        <div className="text-center py-12">
+                          <div className="text-gray-400">
+                            <div className="text-6xl mb-4">🔒</div>
+                            <h3 className="text-lg font-semibold mb-2">Admin Panel Locked</h3>
+                            <p>Click the Admin tab again to authenticate</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between">
+                            <h3 className="text-lg font-semibold text-minecraft-green">Bot Management</h3>
+                            <div className="flex items-center space-x-3">
+                              <Badge variant="outline" className="text-xs">
+                                {adminConnections.filter(conn => conn.isActive).length} Active
+                              </Badge>
+                              <Button
+                                onClick={() => {
+                                  setIsAdminAuthenticated(false);
+                                  setActiveTab('chat');
+                                }}
+                                variant="outline"
+                                size="sm"
+                                className="text-xs"
+                              >
+                                Logout
+                              </Button>
+                            </div>
+                          </div>
+
+                          {isLoadingAdmin ? (
+                            <div className="text-center py-8 text-gray-400">Loading bots...</div>
+                          ) : adminConnections.length === 0 ? (
+                            <div className="text-gray-400 text-center py-8">
+                              No bot connections found
+                            </div>
+                          ) : (
+                            <div className="space-y-3">
+                              {adminConnections.map((conn) => (
+                                <div key={conn.id} className="bg-gray-700 rounded-lg p-4 border border-gray-600">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex-1">
+                                      <div className="flex items-center space-x-3">
+                                        <div className={`w-3 h-3 rounded-full ${
+                                          conn.isActive ? 'bg-status-online animate-pulse' : 'bg-status-offline'
+                                        }`} />
+                                        <div>
+                                          <div className="font-medium text-white">
+                                            {conn.username}
+                                          </div>
+                                          <div className="text-sm text-gray-400">
+                                            {conn.serverIp} • {conn.version}
+                                          </div>
                                         </div>
                                       </div>
-                                    </div>
-                                    <div className="mt-2 flex items-center space-x-4 text-xs text-gray-400">
-                                      <span>
-                                        Status: <span className={conn.isActive ? 'text-green-400' : 'text-red-400'}>
-                                          {conn.isActive ? 'Online' : 'Offline'}
+                                      <div className="mt-2 flex items-center space-x-4 text-xs text-gray-400">
+                                        <span>
+                                          Status: <span className={conn.isActive ? 'text-green-400' : 'text-red-400'}>
+                                            {conn.isActive ? 'Online' : 'Offline'}
+                                          </span>
                                         </span>
-                                      </span>
-                                      {conn.lastPing && (
-                                        <span>Ping: {conn.lastPing}ms</span>
-                                      )}
-                                      <span>
-                                        Created: {formatTime(new Date(conn.createdAt))}
-                                      </span>
+                                        {conn.lastPing !== undefined && (
+                                          <span>Ping: {conn.lastPing}ms</span>
+                                        )}
+                                        <span>
+                                          Created: {formatTime(new Date(conn.createdAt))}
+                                        </span>
+                                      </div>
                                     </div>
-                                  </div>
-                                  <div className="flex space-x-2">
-                                    {conn.isActive && (
-                                      <Button
-                                        onClick={() => handleTerminateBot(conn.id)}
-                                        variant="destructive"
-                                        size="sm"
-                                        className="text-xs"
-                                        data-testid={`terminate-bot-${conn.id}`}
-                                      >
-                                        Terminate
-                                      </Button>
-                                    )}
+                                    <div className="flex space-x-2">
+                                      {conn.isActive && (
+                                        <Button
+                                          onClick={() => handleTerminateBot(conn.id)}
+                                          variant="destructive"
+                                          size="sm"
+                                          className="text-xs"
+                                          data-testid={`terminate-bot-${conn.id}`}
+                                        >
+                                          Terminate
+                                        </Button>
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
 
