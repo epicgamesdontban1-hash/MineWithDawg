@@ -1,0 +1,33 @@
+/home/runner/workspace/node_modules/prismarine-chat/index.js:457
+        throw new Error('unknown chat format code: ' + type) // Server may be attempting to send a chat message before sending a login codec, which is not allowed
+        ^
+
+Error: unknown chat format code: [object Object]
+    at ChatMessage.fromNetwork (/home/runner/workspace/node_modules/prismarine-chat/index.js:457:15)
+    at Client.<anonymous> (/home/runner/workspace/node_modules/mineflayer/lib/plugins/chat.js:122:25)
+    at Client.emit (node:events:524:28)
+    at Client.<anonymous> (/home/runner/workspace/node_modules/minecraft-protocol/src/client/chat.js:203:14)
+    at Client.emit (node:events:524:28)
+    at emitPacket (/home/runner/workspace/node_modules/minecraft-protocol/src/client.js:84:12)
+    at FullPacketParser.<anonymous> (/home/runner/workspace/node_modules/minecraft-protocol/src/client.js:113:9)
+    at FullPacketParser.emit (node:events:524:28)
+    at addChunk (/home/runner/workspace/node_modules/readable-stream/lib/internal/streams/readable.js:323:12)
+    at readableAddChunk (/home/runner/workspace/node_modules/readable-stream/lib/internal/streams/readable.js:300:9)
+    at Readable.push (/home/runner/workspace/node_modules/readable-stream/lib/internal/streams/readable.js:246:10)
+    at FullPacketParser._transform (/home/runner/workspace/node_modules/protodef/src/serializer.js:89:10)
+    at Transform._write (/home/runner/workspace/node_modules/readable-stream/lib/internal/streams/transform.js:153:8)
+    at writeOrBuffer (/home/runner/workspace/node_modules/readable-stream/lib/internal/streams/writable.js:336:12)
+    at _write (/home/runner/workspace/node_modules/readable-stream/lib/internal/streams/writable.js:285:10)
+    at Writable.write (/home/runner/workspace/node_modules/readable-stream/lib/internal/streams/writable.js:288:10)
+    at Decompressor.ondata (/home/runner/workspace/node_modules/readable-stream/lib/internal/streams/readable.js:707:22)
+    at Decompressor.emit (node:events:524:28)
+    at addChunk (/home/runner/workspace/node_modules/readable-stream/lib/internal/streams/readable.js:323:12)
+    at readableAddChunk (/home/runner/workspace/node_modules/readable-stream/lib/internal/streams/readable.js:300:9)
+    at Readable.push (/home/runner/workspace/node_modules/readable-stream/lib/internal/streams/readable.js:246:10)
+    at Unzip.cb (/home/runner/workspace/node_modules/minecraft-protocol/src/transforms/compression.js:69:14)
+    at Unzip.zlibBufferOnEnd (node:zlib:161:10)
+    at Unzip.emit (node:events:524:28)
+    at endReadableNT (node:internal/streams/readable:1698:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:82:21)
+
+Node.js v20.19.3

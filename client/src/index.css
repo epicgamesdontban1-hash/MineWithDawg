@@ -52,7 +52,7 @@
   --shadow-2xl: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00);
   --tracking-normal: 0em;
   --spacing: 0.25rem;
-  
+
   /* Minecraft-themed colors */
   --minecraft-green: hsl(102 45% 49%);
   --minecraft-dark-green: hsl(102 45% 30%);
@@ -82,35 +82,46 @@
   --accent-foreground: hsl(203.7736 87.6033% 52.5490%);
   --destructive: hsl(356.3033 90.5579% 54.3137%);
   --destructive-foreground: hsl(0 0% 100%);
-  --border: hsl(210 5.2632% 14.9020%);
-  --input: hsl(207.6923 27.6596% 18.4314%);
-  --ring: hsl(202.8169 89.1213% 53.1373%);
-  --chart-1: hsl(203.8863 88.2845% 53.1373%);
-  --chart-2: hsl(159.7826 100% 36.0784%);
-  --chart-3: hsl(42.0290 92.8251% 56.2745%);
-  --chart-4: hsl(147.1429 78.5047% 41.9608%);
-  --chart-5: hsl(341.4894 75.2000% 50.9804%);
-  --sidebar: hsl(228 9.8039% 10%);
-  --sidebar-foreground: hsl(0 0% 85.0980%);
-  --sidebar-primary: hsl(202.8169 89.1213% 53.1373%);
-  --sidebar-primary-foreground: hsl(0 0% 100%);
-  --sidebar-accent: hsl(205.7143 70% 7.8431%);
-  --sidebar-accent-foreground: hsl(203.7736 87.6033% 52.5490%);
-  --sidebar-border: hsl(205.7143 15.7895% 26.0784%);
-  --sidebar-ring: hsl(202.8169 89.1213% 53.1373%);
-  --font-sans: Inter, sans-serif;
-  --font-serif: Georgia, serif;
-  --font-mono: 'JetBrains Mono', monospace;
-  --font-gaming: 'Orbitron', monospace;
-  --radius: 1.3rem;
-  --shadow-2xs: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00);
-  --shadow-xs: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00);
-  --shadow-sm: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00), 0px 1px 2px -1px hsl(202.8169 89.1213% 53.1373% / 0.00);
-  --shadow: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00), 0px 1px 2px -1px hsl(202.8169 89.1213% 53.1373% / 0.00);
-  --shadow-md: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00), 0px 2px 4px -1px hsl(202.8169 89.1213% 53.1373% / 0.00);
-  --shadow-lg: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00), 0px 4px 6px -1px hsl(202.8169 89.1213% 53.1373% / 0.00);
-  --shadow-xl: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00), 0px 8px 10px -1px hsl(202.8169 89.1213% 53.1373% / 0.00);
-  --shadow-2xl: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00);
+  --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+  }
+
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
+}
+
+@keyframes bounce-in {
+  0% {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  70% {
+    transform: scale(0.9);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-bounce-in {
+  animation: bounce-in 0.6s ease-out;
 }
 
 @layer base {
@@ -127,63 +138,63 @@
   .font-gaming {
     font-family: var(--font-gaming);
   }
-  
+
   .bg-minecraft-green {
     background-color: var(--minecraft-green);
   }
-  
+
   .bg-minecraft-dark-green {
     background-color: var(--minecraft-dark-green);
   }
-  
+
   .bg-minecraft-gold {
     background-color: var(--minecraft-gold);
   }
-  
+
   .bg-minecraft-stone {
     background-color: var(--minecraft-stone);
   }
-  
+
   .bg-minecraft-dark-stone {
     background-color: var(--minecraft-dark-stone);
   }
-  
+
   .bg-chat-bg {
     background-color: var(--chat-bg);
   }
-  
+
   .bg-status-online {
     background-color: var(--status-online);
   }
-  
+
   .bg-status-offline {
     background-color: var(--status-offline);
   }
-  
+
   .bg-status-connecting {
     background-color: var(--status-connecting);
   }
-  
+
   .text-minecraft-green {
     color: var(--minecraft-green);
   }
-  
+
   .text-minecraft-gold {
     color: var(--minecraft-gold);
   }
-  
+
   .border-minecraft-dark-stone {
     border-color: var(--minecraft-dark-stone);
   }
-  
+
   .focus\:border-minecraft-green:focus {
     border-color: var(--minecraft-green);
   }
-  
+
   .hover\:bg-minecraft-green:hover {
     background-color: var(--minecraft-green);
   }
-  
+
   .hover\:bg-minecraft-dark-green:hover {
     background-color: var(--minecraft-dark-green);
   }

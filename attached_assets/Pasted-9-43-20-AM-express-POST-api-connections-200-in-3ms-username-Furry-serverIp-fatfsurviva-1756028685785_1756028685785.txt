@@ -1,0 +1,63 @@
+9:43:20 AM [express] POST /api/connections 200 in 3ms :: {"username":"Furry","serverIp":"fatfsurviva…
+9:43:21 AM [express] GET /api/connections/4716f068-fbe9-4181-9995-b57d1e7edab0/logs 200 in 1ms :: []
+9:43:25 AM [express] GET /api/connections/4716f068-fbe9-4181-9995-b57d1e7edab0/logs 200 in 0ms :: [{…
+Chunk size is 53 but only 45 was read ; partial packet : {"name":"explosion","params":{"x":1391.3836520295665,"y":110,"z":862.6415280723822,"playerKnockback":{"x":-1.4210724830627441,"y":-2.820675337405138e+36,"z":1.6647764444351196},"explosionParticle":{"type":"vault_connection"},"sound":{"soundId":939184618}}}; buffer :214095bd88dc13e021405b800000000000408af521d97852c801bfb5e5b4fc07cf823fd517656acba3ebbfd3242ea15310f615db04
+Uncaught exception in bot process: TypeError: Cannot read properties of undefined (reading 'x')
+    at Vec3.add (/home/runner/workspace/node_modules/vec3/index.js:82:21)
+    at Client.<anonymous> (/home/runner/workspace/node_modules/mineflayer/lib/plugins/physics.js:299:29)
+    at Client.emit (node:events:536:35)
+    at emitPacket (/home/runner/workspace/node_modules/minecraft-protocol/src/client.js:84:12)
+    at FullPacketParser.<anonymous> (/home/runner/workspace/node_modules/minecraft-protocol/src/client.js:113:9)
+    at FullPacketParser.emit (node:events:524:28)
+    at addChunk (/home/runner/workspace/node_modules/readable-stream/lib/internal/streams/readable.js:323:12)
+    at readableAddChunk (/home/runner/workspace/node_modules/readable-stream/lib/internal/streams/readable.js:300:9)
+    at Readable.push (/home/runner/workspace/node_modules/readable-stream/lib/internal/streams/readable.js:246:10)
+    at FullPacketParser._transform (/home/runner/workspace/node_modules/protodef/src/serializer.js:89:10)
+    at Transform._write (/home/runner/workspace/node_modules/readable-stream/lib/internal/streams/transform.js:153:8)
+    at writeOrBuffer (/home/runner/workspace/node_modules/readable-stream/lib/internal/streams/writable.js:336:12)
+    at _write (/home/runner/workspace/node_modules/readable-stream/lib/internal/streams/writable.js:285:10)
+    at Writable.write (/home/runner/workspace/node_modules/readable-stream/lib/internal/streams/writable.js:288:10)
+    at Decompressor.ondata (/home/runner/workspace/node_modules/readable-stream/lib/internal/streams/readable.js:707:22)
+    at Decompressor.emit (node:events:524:28)
+    at addChunk (/home/runner/workspace/node_modules/readable-stream/lib/internal/streams/readable.js:323:12)
+    at readableAddChunk (/home/runner/workspace/node_modules/readable-stream/lib/internal/streams/readable.js:300:9)
+    at Readable.push (/home/runner/workspace/node_modules/readable-stream/lib/internal/streams/readable.js:246:10)
+    at Decompressor._transform (/home/runner/workspace/node_modules/minecraft-protocol/src/transforms/compression.js:52:12)
+    at Transform._write (/home/runner/workspace/node_modules/readable-stream/lib/internal/streams/transform.js:153:8)
+    at writeOrBuffer (/home/runner/workspace/node_modules/readable-stream/lib/internal/streams/writable.js:336:12)
+    at _write (/home/runner/workspace/node_modules/readable-stream/lib/internal/streams/writable.js:285:10)
+    at Writable.write (/home/runner/workspace/node_modules/readable-stream/lib/internal/streams/writable.js:288:10)
+    at Splitter.ondata (/home/runner/workspace/node_modules/readable-stream/lib/internal/streams/readable.js:707:22)
+    at Splitter.emit (node:events:524:28)
+    at addChunk (/home/runner/workspace/node_modules/readable-stream/lib/internal/streams/readable.js:323:12)
+    at readableAddChunk (/home/runner/workspace/node_modules/readable-stream/lib/internal/streams/readable.js:300:9)
+    at Readable.push (/home/runner/workspace/node_modules/readable-stream/lib/internal/streams/readable.js:246:10)
+    at Splitter._transform (/home/runner/workspace/node_modules/minecraft-protocol/src/transforms/framing.js:61:16)
+    at Transform._write (/home/runner/workspace/node_modules/readable-stream/lib/internal/streams/transform.js:153:8)
+    at writeOrBuffer (/home/runner/workspace/node_modules/readable-stream/lib/internal/streams/writable.js:336:12)
+    at _write (/home/runner/workspace/node_modules/readable-stream/lib/internal/streams/writable.js:285:10)
+    at Writable.write (/home/runner/workspace/node_modules/readable-stream/lib/internal/streams/writable.js:288:10)
+    at Socket.ondata (node:internal/streams/readable:1009:22)
+    at Socket.emit (node:events:524:28)
+    at addChunk (node:internal/streams/readable:561:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+    at Readable.push (node:internal/streams/readable:392:5)
+    at TCP.onStreamRead (node:internal/stream_base_commons:191:23)
+9:43:31 AM [express] GET /api/connections/4716f068-fbe9-4181-9995-b57d1e7edab0/logs 200 in 1ms :: [{…
+9:43:35 AM [express] GET /api/connections/4716f068-fbe9-4181-9995-b57d1e7edab0/logs 304 in 1ms :: [{…
+9:43:41 AM [express] GET /api/connections/4716f068-fbe9-4181-9995-b57d1e7edab0/logs 304 in 1ms :: [{…
+9:43:46 AM [express] GET /api/connections/4716f068-fbe9-4181-9995-b57d1e7edab0/logs 304 in 0ms :: [{…
+9:43:51 AM [express] GET /api/connections/4716f068-fbe9-4181-9995-b57d1e7edab0/logs 304 in 1ms :: [{…
+9:43:55 AM [express] GET /api/connections/4716f068-fbe9-4181-9995-b57d1e7edab0/logs 200 in 1ms :: [{…
+Error: client timed out after 30000 milliseconds
+    at Timeout._onTimeout (/home/runner/workspace/node_modules/minecraft-protocol/src/client/keepalive.js:18:28)
+    at listOnTimeout (node:internal/timers:581:17)
+    at process.processTimers (node:internal/timers:519:7)
+Bot error: Error: client timed out after 30000 milliseconds
+    at Timeout._onTimeout (/home/runner/workspace/node_modules/minecraft-protocol/src/client/keepalive.js:18:28)
+    at listOnTimeout (node:internal/timers:581:17)
+    at process.processTimers (node:internal/timers:519:7)
+Bot error: Error: client timed out after 30000 milliseconds
+    at Timeout._onTimeout (/home/runner/workspace/node_modules/minecraft-protocol/src/client/keepalive.js:18:28)
+    at listOnTimeout (node:internal/timers:581:17)
+    at process.processTimers (node:internal/timers:519:7)
